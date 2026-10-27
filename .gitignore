@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+work/
+Sessions/
+Exports/
+Diagnostics/
+.env
+.env.*

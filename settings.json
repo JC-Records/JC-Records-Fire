@@ -1,0 +1,123 @@
+{
+  "sleep_seconds": 90,
+  "brightness": 1.0,
+  "frame_rate": 15,
+  "velocity": 100,
+  "parameter_profiles": {
+    "FLEX": [
+      "Macro 1",
+      "Macro 2",
+      "Macro 3",
+      "Macro 4",
+      "Filter cutoff",
+      "Resonance",
+      "Attack",
+      "Release",
+      "Reverb",
+      "Delay"
+    ],
+    "Sytrus": [
+      "Modulation X",
+      "Modulation Y",
+      "Main volume",
+      "Filter 1 cutoff",
+      "Filter 1 resonance",
+      "Attack",
+      "Decay",
+      "Sustain",
+      "Release"
+    ],
+    "3x Osc": [
+      "Osc 1 coarse",
+      "Osc 2 coarse",
+      "Osc 3 coarse",
+      "Osc 2 mix",
+      "Osc 3 mix",
+      "Osc 1 fine",
+      "Osc 2 fine",
+      "Osc 3 fine"
+    ],
+    "Serum": [
+      "Macro 1",
+      "Macro 2",
+      "Macro 3",
+      "Macro 4",
+      "Fil Cutoff",
+      "Fil Reso",
+      "Env1 Atk",
+      "Env1 Dec",
+      "Env1 Sus",
+      "Env1 Rel",
+      "A Unison",
+      "A Detune",
+      "LFO1 Rate"
+    ],
+    "Vital": [
+      "Macro 1",
+      "Macro 2",
+      "Macro 3",
+      "Macro 4",
+      "Filter 1 Cutoff",
+      "Filter 1 Resonance",
+      "Env 1 Attack",
+      "Env 1 Decay",
+      "Env 1 Sustain",
+      "Env 1 Release"
+    ],
+    "FPC": [
+      "Volume",
+      "Pan",
+      "Tune",
+      "Output"
+    ],
+    "Fruity Reeverb 2": [
+      "Wet",
+      "Dry",
+      "Decay",
+      "Size",
+      "Low cut",
+      "High cut",
+      "Diffusion",
+      "Predelay"
+    ],
+    "Fruity Delay 3": [
+      "Wet",
+      "Feedback",
+      "Time",
+      "Cutoff",
+      "Resonance",
+      "Diffusion",
+      "Drive"
+    ],
+    "Fruity Parametric EQ 2": [
+      "Band 1 level",
+      "Band 2 level",
+      "Band 3 level",
+      "Band 4 level",
+      "Band 5 level",
+      "Band 6 level",
+      "Band 7 level"
+    ],
+    "Fruity Limiter": [
+      "Gain",
+      "Ceiling",
+      "Threshold",
+      "Ratio",
+      "Attack",
+      "Release",
+      "Sustain"
+    ],
+    "Fruity Blood Overdrive": [
+      "Pre amp",
+      "Color",
+      "Pre band",
+      "Post gain"
+    ],
+    "Fruity Fast Dist": [
+      "Pre",
+      "Threshold",
+      "Mix",
+      "Post"
+    ]
+  }
+}
