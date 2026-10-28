@@ -1,4 +1,4 @@
-# JC Records Fire 0.3.1 validation
+# JC Records Fire 0.3.2 validation
 
 44 host-mocked tests pass, including entry-point execution without __file__, note cleanup, clip scene releases, mute/solo, step extension, hidden melody preservation, parameter paging, FPC mapping, and rendering each mode. These tests do not emulate FL audio timing or the physical Fire.
 
@@ -13,3 +13,5 @@ The user confirmed general operation and requested subsequent palette and status
 FL Studio 2026.1.7 Script Output confirmed JC Records Fire 0.3 initialized | API 45 | output 1 after reload on 28 October 2026, with no startup traceback. Physical testing of the new chord and hold controls remains pending.
 
 0.3.1: 44 host-mocked tests pass, covering bank LED bit-control values, loaded-effect selection, built-in EQ writes and effect addition/removal. FL Studio 2026.1.7 initialized 0.3.1 on API 45 with output assigned and no startup traceback. Physical confirmation of the User 2 indicator remains pending.
+
+0.3.2: 48 host-mocked tests pass. Tests cover inert knob-touch events, hold-and-turn step edits, native step-repeat writes and immediate OLED read-back feedback. FL Studio initialized 0.3.2 successfully on API 45. Physical touch behaviour and native repeat playback remain to be confirmed. The Beta label was removed at the owner's request; this does not change the scope of validation.

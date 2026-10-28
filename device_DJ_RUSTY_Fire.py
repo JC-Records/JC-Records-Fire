@@ -1,4 +1,4 @@
-# name=JC Records Fire 0.3.1 Beta
+# name=JC Records Fire 0.3.2
 # supportedDevices=FL STUDIO FIRE
 # author=JC Records / Codex; see THIRD_PARTY.md
 # GPL-3.0-or-later
@@ -81,6 +81,7 @@ class Fire:
 
     def notify(self, message):
         self.message, self.message_until = message, time.monotonic()+2.5
+        self.last_frame = 0
         ui.setHintMsg('JC Records: '+message)
 
     def init(self):
@@ -95,8 +96,8 @@ class Fire:
             except Exception as exc:
                 print('JC Records OLED unavailable:',exc)
         device.setHasMeters()
-        print('JC Records Fire 0.3.1 initialized | API',general.getVersion(),'| output',device.isAssigned())
-        self.notify('JC Records Fire | Beta 0.3.1')
+        print('JC Records Fire 0.3.2 initialized | API',general.getVersion(),'| output',device.isAssigned())
+        self.notify('JC Records Fire | 0.3.2')
         self.render(time.monotonic())
 
     def voice_on(self, owner, channel, notes, velocity):
@@ -215,10 +216,6 @@ class Fire:
                 channels.selectOneChannel(c)
                 self.last_context = (self.global_channel(),patterns.patternNumber(),bool(transport.isPlaying()))
             self.held[pad] = ['step',c,s,patterns.patternNumber(),False]
-            if self.shift:
-                channels.setGridBit(c,s,1)
-                channels.setStepParameterByIndex(c,patterns.patternNumber(),s,midi.pVelocity,127)
-                self.held[pad][4] = True
         elif self.mode == 'MELODY':
             row,col = divmod(pad,16)
             step = self.page*16+col
@@ -272,18 +269,29 @@ class Fire:
             return
         held_steps = [v for v in self.held.values() if v[0] == 'step']
         if self.mode == 'STEP' and held_steps:
-            params = (midi.pVelocity,midi.pPan,midi.pPitch,midi.pModX)
-            val = 0
+            params = ((midi.pVelocity,midi.pModY,midi.pShift,midi.pRepeat) if self.shift
+                      else (midi.pVelocity,midi.pPan,midi.pPitch,midi.pModX))
+            labels = (('Accent / velocity','Mod Y','Timing shift','Note repeat') if self.shift
+                      else ('Velocity','Pan','Pitch','Mod X'))
+            param=params[knob]
+            maximum=14 if param==midi.pRepeat else 127
+            edited=False
             for v in held_steps:
-                _,c,s,pat,_ = v
-                if pat != patterns.patternNumber():
-                    continue
-                v[4] = True
+                _,c,s,pat,_=v
+                if pat!=patterns.patternNumber():continue
+                v[4]=True
                 channels.setGridBit(c,s,1)
-                old = channels.getCurrentStepParam(c,s,params[knob])
-                val = clamp(old+delta,0,127)
-                channels.setStepParameterByIndex(c,pat,s,params[knob],val)
-            self.notify(('Velocity','Pan','Pitch','Mod X')[knob]+' '+str(val))
+                old=channels.getCurrentStepParam(c,s,param)
+                val=int(clamp(old+delta*(8 if self.shift and knob==0 else 1),0,maximum))
+                channels.setStepParameterByIndex(c,pat,s,param,val)
+                val=channels.getCurrentStepParam(c,s,param)
+                edited=True
+            if edited:
+                repeats=('Off','1/4','1/8 dotted','1/4 triplet','1/8','1/16 dotted','1/8 triplet',
+                         '1/16','1/32 dotted','1/16 triplet','1/32','1/64 dotted','1/32 triplet','1/64','1/64 triplet')
+                value=(repeats[int(clamp(val,0,14))] if param==midi.pRepeat else
+                       '%d (%.1f%%)'%(val,val/127*100))
+                self.show_knob_value('STEP %d CH %d'%(s+1,c+1),labels[knob],value)
             return
         if self.mode == 'MELODY' and self.held:
             for s in {v[1] for v in self.held.values() if v[0] == 'melody'}:

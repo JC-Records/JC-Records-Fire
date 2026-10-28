@@ -15,6 +15,7 @@ class JCControls:
         self.chord_mode = False
         self.note_hold = False
         self.sustained = set()
+        self.knob_feedback = None
         self.config['brightness'] = 1.0
 
     def fx_slots(self, track):
@@ -97,6 +98,11 @@ class JCControls:
     def event(self, event):
         status=event.status & 0xF0
         key=event.data1
+        # The four encoders send note messages when touched, CC only when turned.
+        # Consume touch/release without waking displays or changing any state.
+        if status in (0x80,0x90) and 16<=key<=19:
+            event.handled=True
+            return
         down=status==0x90 and event.data2>0
         if not down or key in (48,49) or not self.safe():
             return super().event(event)
@@ -275,7 +281,55 @@ class JCControls:
             return
         super().pad(pad,down,velocity)
 
+    def show_knob_value(self,title,label,value):
+        self.notify(label+' '+value)
+        self.knob_feedback=(title,label,value)
+        # Update OLED now; pad animation frame rate must not delay knob feedback.
+        if self.screen_ok:
+            import screen
+            for row,text in enumerate(self.knob_feedback):
+                screen.displayText(1,0,row,text,False)
+            screen.update()
+            self.last_text=self.knob_feedback
+
+    def notify(self,message):
+        self.knob_feedback=None
+        super().notify(message)
+
     def knob(self,knob,delta):
+        if not delta:return
+        self.knob_feedback=None
+        self._turn_knob(knob,delta)
+        if self.knob_feedback is not None:return
+        if self.mode in ('STEP','MELODY') and self.held:return
+        if self.mode=='NOTE' and (self.shift or self.alt or self.arp_page):return
+        label=None;value=None
+        if self.knob_mode in ('USER1','USER2'):
+            if self.knob_mode=='USER2' and self.param_signature and self.param_signature[1]=='Built-in mixer EQ':
+                t=self.param_target[0];label=self.param_names[self.param_page*4+knob]
+                if knob<3:
+                    value=(mixer.getEqGain(t,knob,0) if self.param_page==0 else mixer.getEqFrequency(t,knob,0))
+                else:value=mixer.getTrackStereoSep(t) if self.param_page==0 else mixer.getTrackVolume(t)
+            elif self.param_page*4+knob<len(self.param_order):
+                p=self.param_order[self.param_page*4+knob];label=self.param_names[p]
+                value=plugins.getParamValue(p,*self.param_target)
+        elif self.knob_mode=='CHANNEL' and self.selected()>=0:
+            c=self.selected();label=('Volume','Pan','Pitch','Mixer route')[knob]
+            if knob==3:
+                self.show_knob_value('CHANNEL',label,str(channels.getTargetFxTrack(c)));return
+            value=(channels.getChannelVolume,channels.getChannelPan,channels.getChannelPitch)[knob](c)
+        elif self.knob_mode=='MIXER':
+            t=1+self.mix_bank+knob if self.mode=='MIXER' else mixer.trackNumber()
+            if self.mode=='MIXER':
+                pan=self.shift or self.mix_view=='PAN';label='Pan' if pan else 'Volume'
+                value=mixer.getTrackPan(t) if pan else mixer.getTrackVolume(t)
+            else:
+                label=('Volume','Pan','Stereo separation','Bass gain')[knob]
+                value=(mixer.getTrackVolume(t) if knob==0 else mixer.getTrackPan(t) if knob==1
+                       else mixer.getTrackStereoSep(t) if knob==2 else mixer.getEqGain(t,0,0))
+        if label is not None:self.show_knob_value(self.knob_mode+' KNOB '+str(knob+1),label,'%.1f%%'%(value*100))
+
+    def _turn_knob(self,knob,delta):
         if self.mode=='NOTE' and (self.shift or self.arp_page):
             was=self.shift
             self.shift=True
@@ -447,7 +501,7 @@ class JCControls:
 
     def display_lines(self,lines):
         if self.sleeping:return ('JC Records','FIRE AFTER DARK','Touch to wake')
-        if time.monotonic()<self.message_until:return lines
+        if time.monotonic()<self.message_until:return self.knob_feedback or lines
         if self.knob_mode=='USER2' and not (self.mode=='NOTE' and (self.shift or self.arp_page)):
             if self.param_signature and self.param_signature[1]=='Built-in mixer EQ':
                 return ('USER2 EQ T%d P%d'%(self.param_target[0],self.param_page+1),

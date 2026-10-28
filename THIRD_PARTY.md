@@ -1,6 +1,6 @@
 # Attribution and license
 
-JC Records Fire 0.3 Beta is supplied as Python source under GPL-3.0-or-later. See COPYING for the GNU GPL version 3 text. No warranty is provided.
+JC Records Fire 0.3.2 is supplied as Python source under GPL-3.0-or-later. See COPYING for the GNU GPL version 3 text. No warranty is provided.
 
 FIRE-NFX-V2-OG-Plus by Nelson F. Fernandez Jr. (NFX) was inspected as a reference. fireNFX_Defs.py, fireNFX_FireUtils.py and fireNFX_Display.py informed Fire control IDs, RGB SysEx framing and FL screen initialization. Those portions are conservatively treated as adaptations under the reference project's GPL license. Original author credit is retained here. Its engine, bridge and plugin modules are not bundled.
 

@@ -1,13 +1,13 @@
-# JC Records Fire 0.3.1 Beta
+# JC Records Fire 0.3.2
 
-A colourful Akai Fire controller script for FL Studio 2026.1.7 (MIDI scripting API 45). Includes expandable Channel Rack sequencing, chords and arpeggiation, FPC-style drums, clip launching, mixer faders and paged synth/FX controls. Beta: see VALIDATION.md for what has been tested.
+A colourful Akai Fire controller script for FL Studio 2026.1.7 (MIDI scripting API 45). Includes expandable Channel Rack sequencing, chords and arpeggiation, FPC-style drums, clip launching, mixer faders and paged synth/FX controls. See VALIDATION.md for what has been tested.
 
 ## Install
 
 1. Download this repository using **Code â†’ Download ZIP**, then extract it.
 2. Create a folder named **JC Records Fire** inside your FL Studio User data folder under **Settings/Hardware**.
 3. Copy `device_DJ_RUSTY_Fire.py`, `rusty_core.py`, `jc_controls.py` and `settings.json` into that folder. Keep the Python filenames unchanged.
-4. In FL's MIDI settings, enable the **FL STUDIO FIRE** input and select **JC Records Fire 0.3.1 Beta**. Refresh the script list or restart FL if it is missing.
+4. In FL's MIDI settings, enable the **FL STUDIO FIRE** input and select **JC Records Fire 0.3.2**. Refresh the script list or restart FL if it is missing.
 5. Give the Fire input and output the same unused port number. Output is required for pad lights and OLED.
 6. Start with a test project. Select only one controller script for this Fire input.
 
@@ -48,7 +48,7 @@ Mode/channel/pattern/transport changes release script-owned notes. Stop is the p
 
 STEP displays four consecutive Channel Rack channels, sixteen steps per row. Tap a pad to toggle the native FL step on release. Up/down changes Channel Rack banks. Round buttons mute rows; SHIFT + round solos; ALT + round selects. Grid left/right selects pages, automatically extending the pattern up to 256 steps. SHIFT + grid arrows changes length by sixteen steps. Length changes affect the whole FL pattern; shortening can hide later steps.
 
-Hold a step and turn knobs for velocity, pan, pitch and Mod X. Knob edits prevent that pad toggling off on release. SHIFT + pad writes an accented step. Track-select buttons select rows; SHIFT + track-select toggles channel mute.
+Hold a step and turn knobs for velocity, pan, pitch and Mod X. Knob edits prevent that pad toggling off on release. SHIFT + pad alone does not apply an accent; hold the step and turn SHIFT + knob 1. Track-select buttons select rows; SHIFT + track-select toggles channel mute.
 
 These edits write FL Channel Rack steps and are saved with the FLP. Tap toggles an existing step off; hold and turn a knob to edit it instead.
 
@@ -170,3 +170,10 @@ Licensed GPL-3.0-or-later. See COPYING and THIRD_PARTY.md for the licence and re
 The knob-bank LED now uses the Fire bit-control flag for all four banks. User 2 selects a loaded effect on the instrument's routed mixer track (or the selected mixer track in MIXER mode), skipping slots without exposed parameters. SHIFT + left/right cycles available effects; in STEP/MELODY also hold ALT. Regular parameter paging uses left/right, with ALT in STEP/MELODY; Performance mode reserves its arrows for clip navigation.
 
 If that track has no exposed effects, User 2 is preassigned to built-in mixer controls: page 1 = bass gain, mid gain, treble gain, stereo separation; page 2 = bass frequency, mid frequency, treble frequency, track volume. SHIFT makes fine adjustments except in NOTE mode, where SHIFT retains arp editing. The OLED identifies the target track and page. Loading an effect automatically switches to its exposed parameters. No effects are inserted automatically.
+
+## 0.3.2 held-step editing
+
+
+Knob touch/release messages are consumed without actions. Only encoder rotation edits values. Hold a STEP pad and turn: knob 1 velocity, 2 pan, 3 pitch, 4 Mod X. Hold the step with SHIFT: knob 1 accent/velocity (larger increments), 2 Mod Y, 3 timing shift, 4 native note repeat (Off through FL repeat rates). Release after editing leaves that step active. Without a turn, tapping toggles the step as before; SHIFT no longer applies accent on pad press.
+
+The OLED updates immediately on knob rotation with the edited parameter and value read back from FL. Continuous effect values show normalized percentages; step repeat shows its musical rate. Normal STEP parameter values show raw 0-127 and percentage. Plugin percentages describe the exposed normalized control, not physical units such as Hz or milliseconds.
