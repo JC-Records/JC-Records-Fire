@@ -1,4 +1,4 @@
-# name=JC Records Fire 0.2 Beta
+# name=JC Records Fire 0.3 Beta
 # supportedDevices=FL STUDIO FIRE
 # author=JC Records / Codex; see THIRD_PARTY.md
 # GPL-3.0-or-later
@@ -58,7 +58,7 @@ class Fire:
         self.last_beats = None
         self.last_error = None
         self.screen_ok = False
-        self.config = {'sleep_seconds': 90, 'brightness': 0.55, 'frame_rate': 15,
+        self.config = {'sleep_seconds': 600, 'brightness': 0.55, 'frame_rate': 15,
                        'velocity': 100, 'parameter_profiles': {}}
         path = os.path.join(HOME, 'settings.json')
         if os.path.isfile(path):
@@ -95,8 +95,8 @@ class Fire:
             except Exception as exc:
                 print('JC Records OLED unavailable:',exc)
         device.setHasMeters()
-        print('JC Records Fire 0.2 initialized | API',general.getVersion(),'| output',device.isAssigned())
-        self.notify('JC Records Fire | Beta 0.2')
+        print('JC Records Fire 0.3 initialized | API',general.getVersion(),'| output',device.isAssigned())
+        self.notify('JC Records Fire | Beta 0.3')
         self.render(time.monotonic())
 
     def voice_on(self, owner, channel, notes, velocity):

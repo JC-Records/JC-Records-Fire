@@ -1,7 +1,7 @@
 """JC Records Fire control expansion. GPL-3.0-or-later."""
 import time
 import channels, device, general, midi, mixer, patterns, playlist, plugins, transport, ui
-from rusty_core import clamp, default_step, relative, scale_note, CHORDS, ARP_ORDERS, RATES
+from rusty_core import clamp, default_step, relative, scale_note, chord, SCALES, CHORDS, ARP_ORDERS, RATES
 
 class JCControls:
     def __init__(self):
@@ -12,6 +12,9 @@ class JCControls:
         self.drum_channels = False
         self.mix_view = 'VOLUME'
         self.arp_page = False
+        self.chord_mode = False
+        self.note_hold = False
+        self.sustained = set()
         self.config['brightness'] = 1.0
 
     def panic(self):
@@ -20,6 +23,7 @@ class JCControls:
                 playlist.triggerLiveClip(track,block,midi.TLC_Release)
         if hasattr(self,'clip_held'):
             self.clip_held.clear()
+        if hasattr(self,'sustained'): self.sustained.clear()
         super().panic()
 
     def sequence(self):
@@ -73,9 +77,34 @@ class JCControls:
             self.drum_channels=not self.drum_channels
             self.change_mode('DRUM')
             self.notify('DRUM '+('Channel rack' if self.drum_channels else 'FPC / notes'))
-        elif key==45 and self.alt:
+        elif key==45 and self.alt and self.shift:
             self.arp_page=not self.arp_page
             self.notify('ARP knobs '+('ON' if self.arp_page else 'OFF'))
+        elif key==45 and self.alt:
+            self.change_mode('NOTE')
+            self.chord_mode=True
+            self.chord_kind=max(1,self.chord_kind)
+            self.notify('CHORD | rows=inversions')
+        elif key==45 and not self.shift:
+            self.change_mode('NOTE')
+            self.chord_mode=False
+            self.chord_kind=0
+            self.notify('NOTE | single notes')
+        elif key==38 and self.alt and self.mode=='NOTE':
+            enabled=not self.note_hold
+            self.panic()
+            self.note_hold=enabled
+            if enabled: self.latch=False
+            self.notify('NOTE HOLD '+('ON | tap to release' if enabled else 'OFF'))
+        elif key==38 and self.mode=='NOTE':
+            self.panic()
+            self.note_hold=False
+            self.latch=not self.latch
+            self.notify('ARP latch '+('ON' if self.latch else 'OFF'))
+        elif key==36 and self.mode=='NOTE' and self.chord_mode:
+            self.panic()
+            self.chord_kind=1+self.chord_kind%3
+            self.notify('CHORD '+CHORDS[self.chord_kind])
         elif key==26:
             modes=('CHANNEL','MIXER','USER1','USER2')
             self.knob_mode=modes[(modes.index(self.knob_mode)+(-1 if self.shift else 1))%4]
@@ -141,7 +170,25 @@ class JCControls:
         else:
             super().event(event)
 
+    def pad_notes(self,pad):
+        if self.chord_mode and self.mode=='NOTE':
+            row,col=divmod(pad,16)
+            notes=list(chord(col,self.root,self.scale,max(1,self.chord_kind)))
+            # Bottom row: root position; rows above: successive inversions.
+            for _ in range(3-row):
+                if notes: notes.append(notes.pop(0)+12)
+            return tuple(n for n in notes if 0<=n<=127)
+        return super().pad_notes(pad)
+
     def pad(self,pad,down,velocity):
+        if self.mode=='NOTE' and self.note_hold:
+            if down and pad in self.sustained:
+                self.sustained.remove(pad)
+                return super().pad(pad,False,velocity)
+            if not down and pad in self.held:
+                self.sustained.add(pad)
+                return
+
         if self.mode=='PERFORM':
             if not down:
                 target=self.clip_held.pop(pad,None)
@@ -286,19 +333,30 @@ class JCControls:
                 status=playlist.getLiveBlockStatus(track,self.clip_block+col,0) if ready and track<=playlist.trackCount() else 0
                 base=palette[(self.clip_block+col)//4%4]
                 colors[pad]=((40,127,75) if status&4 else
-                    (tint((127,115,65),1 if int(now*5)%2 else 0.3) if status&2 else tint(base,0.7 if status&1 else 0.035)))
+                    (tint((127,115,65),1 if int(now*5)%2 else 0.3) if status&2 else (tint(base,0.7) if status&1 else (0,0,0))))
         elif self.mode=='NOTE':
             for pad in range(64):
                 notes=self.pad_notes(pad)
                 root=bool(notes and notes[0]%12==self.root%12)
                 # Root notes are gold; other pitches form an ice-blue keyboard.
                 colors[pad]=(127,88,12) if root else tint((20,65,127),0.35+(notes[0]%12)/24 if notes else 0.2)
+                if self.chord_mode:
+                    row,col=divmod(pad,16)
+                    palette=((127,55,8),(95,20,127),(15,110,95),(127,20,65),(50,65,127),(127,85,10),(35,127,40))
+                    colors[pad]=tint(palette[col%len(SCALES[self.scale])%7],0.45+0.12*(3-row))
                 if pad in self.held:colors[pad]=(127,127,127)
+                if pad in self.sustained:colors[pad]=(25,127,85)
         elif self.mode=='DRUM':
             palette=((127,35,4),(127,8,42),(90,15,127),(8,110,105))
             for pad in range(64):
                 row,col=divmod(pad,16)
-                colors[pad]=tint(palette[col//4],0.55+0.12*(3-row))
+                index=(3-row)*4+(col%4)+(col//4)*16
+                c=self.selected()
+                valid=True
+                if self.drum_channels:valid=self.channel_bank+index<channels.channelCount()
+                elif c>=0 and plugins.isValid(c) and plugins.getPluginName(c)=='FPC':
+                    valid=index<plugins.getPadInfo(c,-1,0,0)
+                colors[pad]=tint(palette[col//4],0.55+0.12*(3-row)) if valid else (0,0,0)
                 if pad in self.held:colors[pad]=(127,127,127)
         elif self.mode=='MELODY':
             seq=self.sequence()
@@ -329,16 +387,21 @@ class JCControls:
                         colors[row*16+col]=tint((127,8,8) if muted else base,0.35 if muted and col<=level and value>0 else (0.85 if col<=level and value>0 else 0.045))
                         if col==peak and peak>0:colors[row*16+col]=(127,127,127)
         elif self.mode=='STEP':
-            for row in range(4):
-                c=self.channel_bank+row
-                if c<channels.channelCount() and channels.isChannelMuted(c):
-                    for col in range(16):
-                        p=row*16+col;colors[p]=tuple(int(v*0.2) for v in colors[p])
+            for pad in range(64):
+                row,col=divmod(pad,16);c=self.channel_bank+row
+                active=c<channels.channelCount() and channels.getGridBit(c,self.page*16+col)
+                pressed=pad in self.held
+                power=1 if active or pressed else 0
+                if active and not pressed and channels.isChannelMuted(c):power=0.25
+                colors[pad]=self.row_color(row,power)
         return colors
 
     def display_lines(self,lines):
         if self.sleeping:return ('JC Records','FIRE AFTER DARK','Touch to wake')
         if time.monotonic()<self.message_until:return lines
+        if self.mode=='NOTE' and not (self.shift or self.arp_page):
+            title=('CHORD '+CHORDS[self.chord_kind] if self.chord_mode else 'NOTE')+(' HOLD' if self.note_hold else '')
+            return (title,self.scale+' Root '+str(self.root),'Held %d | ALT+M3 hold'%len(self.sustained))
         if self.mode=='PERFORM':return ('CLIP PERFORMANCE','Tracks %d-%d'%(self.clip_track,self.clip_track+3),'Blocks %d-%d'%(self.clip_block+1,self.clip_block+16))
         if self.mode=='NOTE' and (self.shift or self.arp_page):return ('ARP '+('ON' if self.arp else 'OFF'),'%d/beat Gate %d%%'%(RATES[self.arp_rate],self.arp_gate*100),'%d oct %s'%(self.arp_octaves,ARP_ORDERS[self.arp_order]))
         if self.knob_mode=='CHANNEL':return (self.mode+' | CHANNEL','Volume / Pan','Pitch / Mixer route')

@@ -1,19 +1,19 @@
-# JC Records Fire 0.2 Beta
+# JC Records Fire 0.3 Beta
 
 A colourful Akai Fire controller script for FL Studio 2026.1.7 (MIDI scripting API 45). Includes expandable Channel Rack sequencing, chords and arpeggiation, FPC-style drums, clip launching, mixer faders and paged synth/FX controls. Beta: see VALIDATION.md for what has been tested.
 
 ## Install
 
-1. Download this repository using **Code → Download ZIP**, then extract it.
+1. Download this repository using **Code â†’ Download ZIP**, then extract it.
 2. Create a folder named **JC Records Fire** inside your FL Studio User data folder under **Settings/Hardware**.
 3. Copy `device_DJ_RUSTY_Fire.py`, `rusty_core.py`, `jc_controls.py` and `settings.json` into that folder. Keep the Python filenames unchanged.
-4. In FL's MIDI settings, enable the **FL STUDIO FIRE** input and select **JC Records Fire 0.2 Beta**. Refresh the script list or restart FL if it is missing.
+4. In FL's MIDI settings, enable the **FL STUDIO FIRE** input and select **JC Records Fire 0.3 Beta**. Refresh the script list or restart FL if it is missing.
 5. Give the Fire input and output the same unused port number. Output is required for pad lights and OLED.
 6. Start with a test project. Select only one controller script for this Fire input.
 
 For upgrades from DJ RUSTY Fire, replace the four files in that existing Hardware folder instead of creating a second installation. Back up its Sessions and Exports folders first. FL may retain the older controller-list label until its list is refreshed.
 
-No watcher executable, MIDI bridge or external Python package is required. The previous loader fix initialized successfully in FL Studio 2026.1.7 (MIDI API 45); the 0.2 expansion needs physical verification. Full controller feature testing remains incomplete.
+No watcher executable, MIDI bridge or external Python package is required. The previous loader fix initialized successfully in FL Studio 2026.1.7 (MIDI API 45); version 0.3 initialized successfully; the new controls need physical verification. Full controller feature testing remains incomplete.
 
 ## Main controls
 
@@ -102,13 +102,13 @@ Edit parameter_profiles in settings.json using exact plugin names and preferred 
 
 ## Mixer
 
-SHIFT + PERFORM displays four rows, starting with inserts 1-4; master is excluded. Row-coloured pads show volume, amber marks peak activity, red indicates mute. Tap a column to set volume. Leftmost is silence; rightmost is normalized maximum, not necessarily 0 dB.
+SHIFT + PERFORM displays four rows, starting with inserts 1-4; master is excluded. Green/amber/red bars show volume and white marks peak activity. Tap a column to set volume. Leftmost is silence; rightmost is normalized maximum, not necessarily 0 dB.
 
 In Mixer knob mode, knobs adjust these four faders. SHIFT controls pan and ALT gives fine volume adjustment. Up/down changes banks. Track-select selects a row; round buttons mute it, SHIFT solos and ALT arms it. ALT + Select switches pad faders between volume and pan. SHIFT + pad mutes and ALT + pad solos. KNOB MODE switches to selected-track FX controls.
 
 ## JC Records sleep show
 
-After 90 seconds without input, while stopped with no held/latched notes, pads cycle plasma, rainbow waves, a comet and scrolling JC RECORDS text. OLED shows JC Records / FIRE AFTER DARK. Input wakes the display and performs its normal action. Playback restores the working display.
+After 10 minutes without input, while stopped with no held/latched notes, pads cycle plasma, rainbow waves, a comet and scrolling JC RECORDS text. OLED shows JC Records / FIRE AFTER DARK. Input wakes the display and performs its normal action. Playback restores the working display.
 
 settings.json exposes sleep_seconds, brightness (0.05-1) and frame_rate (5-30). This runs while FL and the script are active, not while the computer/USB device is asleep or powered off.
 
@@ -126,16 +126,16 @@ Official API reference: https://www.image-line.com/fl-studio-learning-content/fl
 
 ## Row colours
 
-STEP only, top to bottom: cyan, purple, amber and green. Other modes have distinct palettes described below. Inactive pads show dim versions of the row colour; active steps are brighter. White pressed-pad/playhead highlights, red mixer mute indicators and amber peak markers override the row colour. Sleep animations keep their animated palette.
+STEP only, top to bottom: cyan, purple, amber and green. Other modes have distinct palettes described below. Inactive STEP pads are dark; pressed and active steps use their row colour. STEP keeps its row colour when pressed; other modes use their own status highlights. Sleep animations keep their animated palette.
 
 ## Extra 0.2 controls
 
-- PERFORM: launch configured Playlist Performance clips. FL Performance mode must already be enabled and clips arranged in its live area. Launches use FL track snapping. Arrows move through 16 clip columns; up/down moves through four tracks. SHIFT + pad launches the visible four-track column; ALT + pad or a round button stops a track. Empty cells remain dim, queued clips pulse, playing clips brighten. Clip release follows the track trigger settings.
+- PERFORM: launch configured Playlist Performance clips. FL Performance mode must already be enabled and clips arranged in its live area. Launches use FL track snapping. Arrows move through 16 clip columns; up/down moves through four tracks. SHIFT + pad launches the visible four-track column; ALT + pad or a round button stops a track. Empty cells are dark, queued clips pulse, playing clips brighten. Clip release follows the track trigger settings.
 - SHIFT + PERFORM: mixer. Four coloured horizontal faders, track selection, mute/solo/arm and volume/pan view.
 - Channel knobs: volume, pan, pitch, mixer route; SHIFT gives fine continuous adjustment.
 - Mixer knobs: four row volumes in mixer mode (SHIFT for pan, ALT for fine); elsewhere selected-track volume, pan, stereo separation and low EQ gain.
 - User 1: priority-mapped instrument controls. User 2: priority-mapped FX controls. Arrows page exposed parameters; in STEP hold ALT to page parameters instead of steps. SHIFT selects FX slots (SHIFT + ALT in STEP).
-- ALT + NOTE: latch the arp editing knob page. SHIFT + knobs also edits rate, gate, octaves and direction. SHIFT + NOTE toggles arp playback.
+- SHIFT + ALT + NOTE: latch the arp editing knob page. SHIFT + knobs also edits rate, gate, octaves and direction. SHIFT + NOTE toggles arp playback.
 - ALT + NOTE-mode knobs: velocity, root, chord type, brightness (when arp editing page is off).
 - Brightness starts at maximum. Rows are cyan, purple, amber and green. All addressable button LEDs are enabled with state highlights; their colours are constrained by the Fire's hardware.
 
@@ -148,6 +148,15 @@ STEP keeps cyan, purple, amber and green rows. NOTE uses an ice-blue keyboard wi
 Round mute buttons: bright = active, dim = muted, flashing = solo. These single-colour LEDs follow Channel Rack and mixer state, including changes made in FL.
 
 The small rectangular indicators beside the round buttons show bright green for active, bright red for muted, and flashing green for solo in STEP/MELODY/DRUM and MIXER. They follow mute/solo instead of channel selection.
+
+## 0.3 chord mode and synth hold
+
+- ALT + NOTE enters CHORD mode. Columns move through scale roots; the bottom row plays root-position chords and each row above raises one more chord tone by an octave. Round button 1 cycles triads, sevenths and octaves. NOTE returns to single notes.
+- ALT + round button 3 toggles NOTE HOLD in NOTE or CHORD mode. Tap a pad to sustain; tap again to release. Held pads glow mint. Stop, mode changes, channel/pattern changes and project changes release held notes. Switching between arp latch and note hold clears the previous notes.
+- SHIFT + NOTE still switches the arp on/off. SHIFT + knobs edits its rate, gate, octaves and order. SHIFT + ALT + NOTE locks that knob page. Chord pads feed the arp too.
+- Idle display timeout is now 600 seconds (10 minutes); held notes and playback keep the working display awake.
+- STEP lights only pressed/active pads in automatic row colours. Empty steps stay off, including during playback.
+- DRUM keeps coloured 4x4 blocks, with unaddressable FPC/Channel Rack pads dark. Generic synth drum pads remain chromatic because the host does not expose sample occupancy. Clip mode lights only populated slots, with gold queued and green playing states.
 
 ## Development
 

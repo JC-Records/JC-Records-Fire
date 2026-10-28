@@ -1,8 +1,12 @@
-# 0.2 — JC Records
+# 0.3
+
+Chord inversions, synth note hold, 10-minute idle timeout, dark inactive steps and empty clips, and drum availability lighting. 40 host-mocked checks pass.
+
+# 0.2 â€” JC Records
 
 Row mute/solo, expandable step pages, clip Performance mode, drum pad blocks, mixer pan/fader views, four knob banks, adjustable arp page, maximum brightness, button LEDs and JC RECORDS sleep animation.
 
-# 0.1.1 — startup repair
+# 0.1.1 â€” startup repair
 
 - Fix NameError at startup caused by assuming FL defines __file__ for the controller entry point.
 - Add a regression test using FL-style string execution without __file__.

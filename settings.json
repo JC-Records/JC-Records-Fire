@@ -1,5 +1,5 @@
 {
-  "sleep_seconds": 90,
+  "sleep_seconds": 600,
   "brightness": 1.0,
   "frame_rate": 15,
   "velocity": 100,
