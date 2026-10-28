@@ -393,6 +393,66 @@ class HostTests(unittest.TestCase):
         self.assertFalse(f.voices)
         self.assertFalse(f.queue)
 
+    def test_knob_indicators_enable_bit_control(self):
+        packets=[]
+        self.device.midiOutNewMsg=lambda msg,slot:packets.append((slot,(msg>>16)&127))
+        for mode,value in [('CHANNEL',17),('MIXER',18),('USER1',20),('USER2',24)]:
+            self.fire.knob_mode=mode
+            self.fire.send_leds()
+            self.assertEqual(dict(packets)[27],value)
+
+    def test_user2_selects_loaded_effect_and_skips_empty_slots(self):
+        f=self.fire; f.knob_mode='USER2'; f.mode='DRUM'
+        self.plugins.isValid=lambda track,slot=-1:slot in (2,7)
+        f.scan_parameters(1,True)
+        self.assertEqual(f.param_target,(1,2))
+        writes=[]
+        self.plugins.setParamValue=lambda v,p,t,s:writes.append((v,p,t,s))
+        f.knob(0,1)
+        self.assertEqual(writes[0][2:],(1,2))
+        f.shift=True; self.event(35)
+        self.assertEqual(f.fx_slot,7)
+        self.event(35)
+        self.assertEqual(f.fx_slot,2)
+
+    def test_user2_builtin_eq_pages_and_parameter_writes(self):
+        f=self.fire; f.knob_mode='USER2'; f.mode='DRUM'
+        self.plugins.isValid=lambda *a:False
+        mx=sys.modules['mixer']; writes=[]
+        mx.getEqGain=lambda *a:0.5
+        mx.setEqGain=lambda t,b,v:writes.append(('gain',t,b,v))
+        mx.getEqFrequency=lambda *a:0.5
+        mx.setEqFrequency=lambda t,b,v:writes.append(('freq',t,b,v))
+        mx.getTrackStereoSep=lambda t:0
+        mx.setTrackStereoSep=lambda t,v:writes.append(('stereo',t,v))
+        f.scan_parameters(1,True)
+        self.assertEqual(len(f.param_order),8)
+        for k in range(4):f.knob(k,1)
+        self.assertEqual([w[0] for w in writes],['gain','gain','gain','stereo'])
+        self.assertTrue(all(w[1]==1 for w in writes))
+        self.event(35)
+        self.assertEqual(f.param_page,1)
+        f.knob(0,1); f.knob(3,1)
+        self.assertEqual(writes[-1][:3],('freq',1,0))
+        self.assertAlmostEqual(self.volumes[1],0.51)
+        f.scan_parameters(100)
+        self.assertEqual(f.param_page,1)
+        f.message_until=0
+        self.assertIn('USER2 EQ',f.display_lines(('','',''))[0])
+
+    def test_user2_recovers_when_effect_is_added_or_removed(self):
+        f=self.fire;f.knob_mode='USER2'
+        self.plugins.isValid=lambda *a:False
+        f.scan_parameters(1,True)
+        self.assertEqual(f.param_signature[1],'Built-in mixer EQ')
+        self.plugins.isValid=lambda t,s=-1:s==4
+        f.scan_parameters(2)
+        self.assertEqual(f.param_target,(1,4))
+        self.assertEqual(len(f.param_order),5)
+        self.plugins.isValid=lambda *a:False
+        f.scan_parameters(3)
+        self.assertEqual(f.param_signature[1],'Built-in mixer EQ')
+
     def test_fx_target_uses_drum_route_or_selected_mixer(self):
         f=self.fire; f.knob_mode='USER2'; f.mode='DRUM'
         self.assertEqual(f.target(),(1,0))
