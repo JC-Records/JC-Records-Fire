@@ -184,6 +184,56 @@ class HostTests(unittest.TestCase):
         self.assertEqual([dict(packets)[k] for k in (36,37,38)],[1,0,2])
         self.assertEqual([dict(packets)[k] for k in (40,41,42)],[3,0,4])
 
+    def test_chord_mode_and_inversions(self):
+        f=self.fire; f.alt=True; self.event(45); f.alt=False
+        self.assertTrue(f.chord_mode)
+        self.assertEqual(f.pad_notes(48),(48,51,55))
+        self.assertEqual(f.pad_notes(32),(51,55,60))
+        self.event(102); self.assertEqual(len(f.held[48][2]),3)
+        self.event(45)
+        self.assertFalse(f.chord_mode); self.assertFalse(f.voices)
+        self.assertEqual(len(f.pad_notes(48)),1)
+
+    def test_synth_hold_toggles_and_stop_releases(self):
+        f=self.fire; self.event(45); f.alt=True; self.event(38); f.alt=False
+        self.event(102); self.event(102,0)
+        self.assertTrue(f.voices); self.assertIn(48,f.sustained)
+        self.event(102); self.event(102,0)
+        self.assertFalse(f.voices); self.assertFalse(f.sustained)
+        self.event(103); self.event(103,0); self.event(52)
+        self.assertFalse(f.voices); self.assertFalse(f.sustained)
+
+    def test_hold_disable_releases_and_latch_is_separate(self):
+        f=self.fire; f.mode='NOTE'; f.alt=True; self.event(38); f.alt=False
+        self.event(102); self.event(102,0)
+        self.event(38)
+        self.assertFalse(f.note_hold); self.assertTrue(f.latch); self.assertFalse(f.voices)
+
+    def test_step_only_active_or_pressed_pads_are_coloured(self):
+        f=self.fire
+        self.grid[(0,2)]=1; self.grid[(1,2)]=1
+        self.event(54)
+        f.render(100)
+        self.assertEqual(f.last_colors[0],f.row_color(0))
+        self.assertEqual(f.last_colors[1],(0,0,0))
+        self.assertEqual(f.last_colors[2],f.row_color(0))
+        self.assertEqual(f.last_colors[18],f.row_color(1))
+        self.event(54,0); self.event(54); self.event(54,0); f.render(101)
+        self.assertEqual(f.last_colors[0],(0,0,0))
+
+    def test_empty_clips_and_unavailable_fpc_pads_are_dark(self):
+        f=self.fire; f.mode='PERFORM'
+        sys.modules['playlist'].getLiveBlockStatus=lambda *a:0
+        f.render(100); self.assertTrue(all(c==(0,0,0) for c in f.last_colors))
+        f.mode='DRUM'; self.plugins.getPluginName=lambda *a:'FPC'
+        self.plugins.getPadInfo=lambda *a:32
+        f.render(101)
+        self.assertNotEqual(f.last_colors[48],(0,0,0))
+        self.assertEqual(f.last_colors[56],(0,0,0))
+
+    def test_idle_timeout_default_is_ten_minutes(self):
+        self.assertEqual(self.fire.config['sleep_seconds'],600)
+
     def test_round_buttons_mute_and_shift_solo(self):
         calls=[]
         self.channels.muteChannel=lambda c:calls.append(('mute',c))
