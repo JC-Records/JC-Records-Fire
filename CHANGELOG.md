@@ -12,3 +12,9 @@ Row mute/solo, expandable step pages, clip Performance mode, drum pad blocks, mi
 - Add a regression test using FL-style string execution without __file__.
 - Print version, MIDI scripting API and output assignment after initialization.
 - Confirm actual loading in FL Studio 2026.1.7/API 45.
+
+## 0.3.1
+
+- Correct knob-bank LED bit-control encoding.
+- User 2 skips empty effects and provides two pages of built-in EQ/mixer controls when no effects expose parameters.
+- Four regression tests added (44 passing).

@@ -17,6 +17,37 @@ class JCControls:
         self.sustained = set()
         self.config['brightness'] = 1.0
 
+    def fx_slots(self, track):
+        return [slot for slot in range(10)
+                if plugins.isValid(track,slot) and plugins.getParamCount(track,slot)>0]
+
+    def target(self):
+        target=super().target()
+        if self.knob_mode=='USER2':
+            track,slot=target
+            slots=self.fx_slots(track)
+            if slots and slot not in slots:
+                self.fx_slot=slots[0]
+                return track,self.fx_slot
+        return target
+
+    def scan_parameters(self, now, force=False):
+        if self.knob_mode=='USER2':
+            target=self.target()
+            if not self.fx_slots(target[0]):
+                signature=(target,'Built-in mixer EQ',8)
+                if force or signature!=self.param_signature:
+                    self.param_page=0
+                self.param_signature,self.param_target=signature,target
+                self.param_names=['Bass gain','Mid gain','Treble gain','Stereo separation',
+                                  'Bass frequency','Mid frequency','Treble frequency','Track volume']
+                self.param_order=list(range(8))
+                self.scan_names=self.param_names[:]
+                self.scan_cursor=0
+                self.last_scan=now
+                return
+        super().scan_parameters(now,force)
+
     def panic(self):
         for targets in getattr(self,'clip_held',{}).values():
             for track,block in targets:
@@ -128,7 +159,9 @@ class JCControls:
             elif self.mode=='MIXER' and not self.alt and self.knob_mode!='USER2':
                 self.mix_bank=clamp(self.mix_bank+d*4,0,max(0,mixer.trackCount()-6))
             elif self.shift and self.knob_mode=='USER2':
-                self.fx_slot=clamp(self.fx_slot+d,0,9)
+                slots=self.fx_slots(self.target()[0])
+                if slots:
+                    self.fx_slot=slots[(slots.index(self.fx_slot)+d)%len(slots)]
                 self.scan_parameters(time.monotonic(),True)
             else:
                 self.param_page=clamp(self.param_page+d,0,max(0,(len(self.param_order)-1)//4))
@@ -285,6 +318,22 @@ class JCControls:
             elif knob==2:mixer.setTrackStereoSep(t,clamp(mixer.getTrackStereoSep(t)+step,-1,1))
             else:mixer.setEqGain(t,0,clamp(mixer.getEqGain(t,0,0)+step,0,1))
             return
+        if self.knob_mode=='USER2':
+            self.scan_parameters(time.monotonic(),self.target()!=self.param_target)
+            if self.param_signature[1]=='Built-in mixer EQ':
+                track=self.param_target[0]
+                step=delta/(1000 if self.shift else 100)
+                if knob<3:
+                    if self.param_page==0:
+                        mixer.setEqGain(track,knob,clamp(mixer.getEqGain(track,knob,0)+step,0,1))
+                    else:
+                        mixer.setEqFrequency(track,knob,clamp(mixer.getEqFrequency(track,knob,0)+step,0,1))
+                elif self.param_page==0:
+                    mixer.setTrackStereoSep(track,clamp(mixer.getTrackStereoSep(track)+step,-1,1))
+                else:
+                    mixer.setTrackVolume(track,clamp(mixer.getTrackVolume(track)+step,0,1))
+                self.notify('Track %d | '%track+self.param_names[self.param_page*4+knob])
+                return
         super().knob(knob,delta)
 
     def send_leds(self):
@@ -299,7 +348,7 @@ class JCControls:
         # Light every addressable control; state uses brighter values.
         for key in (31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53):
             led(key,1)
-        led(27,{'CHANNEL':1,'MIXER':2,'USER1':4,'USER2':8}[self.knob_mode])
+        led(27,16 | {'CHANNEL':1,'MIXER':2,'USER1':4,'USER2':8}[self.knob_mode])
         led({'STEP':44,'MELODY':44,'NOTE':45,'DRUM':46,'MIXER':47,'PERFORM':47}[self.mode],4)
         led(48,2 if self.shift else 1);led(49,2 if self.alt else 1)
         led(50,4 if transport.getLoopMode() else 3)
@@ -399,6 +448,12 @@ class JCControls:
     def display_lines(self,lines):
         if self.sleeping:return ('JC Records','FIRE AFTER DARK','Touch to wake')
         if time.monotonic()<self.message_until:return lines
+        if self.knob_mode=='USER2' and not (self.mode=='NOTE' and (self.shift or self.arp_page)):
+            if self.param_signature and self.param_signature[1]=='Built-in mixer EQ':
+                return ('USER2 EQ T%d P%d'%(self.param_target[0],self.param_page+1),
+                        'Bass / Mid / Treble' if self.param_page==0 else 'Bass/Mid/Treble freq',
+                        '4: Stereo separation' if self.param_page==0 else '4: Track volume')
+            return ('USER2 FX%d T%d P%d'%(self.fx_slot+1,self.target()[0],self.param_page+1),lines[1],lines[2])
         if self.mode=='NOTE' and not (self.shift or self.arp_page):
             title=('CHORD '+CHORDS[self.chord_kind] if self.chord_mode else 'NOTE')+(' HOLD' if self.note_hold else '')
             return (title,self.scale+' Root '+str(self.root),'Held %d | ALT+M3 hold'%len(self.sustained))

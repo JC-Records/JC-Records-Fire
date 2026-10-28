@@ -1,4 +1,4 @@
-# JC Records Fire 0.3 Beta
+# JC Records Fire 0.3.1 Beta
 
 A colourful Akai Fire controller script for FL Studio 2026.1.7 (MIDI scripting API 45). Includes expandable Channel Rack sequencing, chords and arpeggiation, FPC-style drums, clip launching, mixer faders and paged synth/FX controls. Beta: see VALIDATION.md for what has been tested.
 
@@ -7,7 +7,7 @@ A colourful Akai Fire controller script for FL Studio 2026.1.7 (MIDI scripting A
 1. Download this repository using **Code â†’ Download ZIP**, then extract it.
 2. Create a folder named **JC Records Fire** inside your FL Studio User data folder under **Settings/Hardware**.
 3. Copy `device_DJ_RUSTY_Fire.py`, `rusty_core.py`, `jc_controls.py` and `settings.json` into that folder. Keep the Python filenames unchanged.
-4. In FL's MIDI settings, enable the **FL STUDIO FIRE** input and select **JC Records Fire 0.3 Beta**. Refresh the script list or restart FL if it is missing.
+4. In FL's MIDI settings, enable the **FL STUDIO FIRE** input and select **JC Records Fire 0.3.1 Beta**. Refresh the script list or restart FL if it is missing.
 5. Give the Fire input and output the same unused port number. Output is required for pad lights and OLED.
 6. Start with a test project. Select only one controller script for this Fire input.
 
@@ -163,3 +163,10 @@ The small rectangular indicators beside the round buttons show bright green for 
 Run `python tests/test_fire.py` with Python 3.10 or newer. Tests mock the FL host and do not require a connected Fire. The controller itself runs inside FL Studio; launching the entry script with desktop Python will not provide the FL modules.
 
 Licensed GPL-3.0-or-later. See COPYING and THIRD_PARTY.md for the licence and reference-project credits.
+
+## 0.3.1 User 2 controls
+
+
+The knob-bank LED now uses the Fire bit-control flag for all four banks. User 2 selects a loaded effect on the instrument's routed mixer track (or the selected mixer track in MIXER mode), skipping slots without exposed parameters. SHIFT + left/right cycles available effects; in STEP/MELODY also hold ALT. Regular parameter paging uses left/right, with ALT in STEP/MELODY; Performance mode reserves its arrows for clip navigation.
+
+If that track has no exposed effects, User 2 is preassigned to built-in mixer controls: page 1 = bass gain, mid gain, treble gain, stereo separation; page 2 = bass frequency, mid frequency, treble frequency, track volume. SHIFT makes fine adjustments except in NOTE mode, where SHIFT retains arp editing. The OLED identifies the target track and page. Loading an effect automatically switches to its exposed parameters. No effects are inserted automatically.
