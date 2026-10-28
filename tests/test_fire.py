@@ -111,7 +111,7 @@ class HostTests(unittest.TestCase):
         self.device=mod('device',isAssigned=lambda:True,setHasMeters=lambda:None,
             midiOutSysex=lambda s:self.sysex.append(s),midiOutNewMsg=lambda *a:None)
         mod('general',getVersion=lambda:44,getRecPPQ=lambda:96,safeToEdit=lambda:self.safe)
-        mod('midi',pPitch=0,pVelocity=1,pPan=4,pModX=5,SONGLENGTH_ABSTICKS=2,widPianoRoll=3,widBrowser=4)
+        mod('midi',pPitch=0,pVelocity=1,pPan=4,pModX=5,pModY=6,pShift=7,pRepeat=8,SONGLENGTH_ABSTICKS=2,widPianoRoll=3,widBrowser=4)
         mod('mixer',trackNumber=lambda:3,trackCount=lambda:127,getCurrentTempo=lambda:120,
             getSongStepPos=lambda:0,getTrackVolume=lambda t,mode=0:self.volumes.get(t,0.5),
             setTrackVolume=lambda t,v:self.volumes.__setitem__(t,v),getTrackPeaks=lambda t,m:0.3,
@@ -392,6 +392,64 @@ class HostTests(unittest.TestCase):
         self.playing=False; f.idle()
         self.assertFalse(f.voices)
         self.assertFalse(f.queue)
+
+    def test_touch_and_release_never_edit_or_wake(self):
+        f=self.fire; f.sleeping=True
+        before=(f.last_action,f.knob_mode,f.param_page)
+        for shift in (False,True):
+            f.shift=shift
+            for k in range(16,20):
+                for status,value in ((0x90,127),(0x90,0),(0x80,0)):
+                    self.assertTrue(self.event(k,value,status).handled)
+        self.assertTrue(f.sleeping)
+        self.assertEqual(before,(f.last_action,f.knob_mode,f.param_page))
+        self.assertFalse(self.params)
+        self.assertFalse(self.notes)
+
+    def test_shift_pad_does_not_accent_without_turn(self):
+        f=self.fire;f.shift=True
+        self.event(54)
+        self.assertFalse(self.params)
+        self.assertFalse(self.grid)
+        self.event(54,0)
+        self.assertEqual(self.grid[(0,0)],1)
+        self.assertFalse(self.params)
+
+    def test_step_repeat_and_modifiers_require_hold_and_rotation(self):
+        f=self.fire
+        self.channels.getCurrentStepParam=lambda c,s,p:self.params.get((c,1,s,p),0 if p==8 else 64)
+        self.event(54);f.shift=True
+        self.event(19,127,0x90)
+        self.assertFalse(self.params)
+        self.event(19,1,0xB0)
+        self.assertEqual(self.params[(0,1,0,8)],1)
+        self.assertEqual(f.knob_feedback[1: ],('Note repeat','1/4'))
+        self.event(17,1,0xB0)
+        self.assertEqual(self.params[(0,1,0,6)],65)
+        self.event(18,1,0xB0)
+        self.assertEqual(self.params[(0,1,0,7)],65)
+        self.event(16,1,0xB0)
+        self.assertEqual(self.params[(0,1,0,1)],72)
+        self.event(54,0)
+        self.assertEqual(self.grid[(0,0)],1)
+        f.shift=False
+        count=len(self.params)
+        self.event(19,0,0x80)
+        self.assertEqual(len(self.params),count)
+
+    def test_knob_oled_updates_immediately_with_actual_percentage(self):
+        f=self.fire;f.knob_mode='USER1';f.scan_parameters(1,True)
+        self.plugins.getParamValue=lambda p,*a:self.params.get(p,0.5)
+        calls=[];screen=sys.modules['screen']
+        screen.displayText=lambda *a:calls.append(a)
+        screen.update=lambda:calls.append('update')
+        f.screen_ok=True
+        self.event(16,1,0xB0)
+        self.assertIn('51.0%',f.knob_feedback[2])
+        self.assertEqual(calls[-1],'update')
+        self.event(16,1,0xB0)
+        self.assertEqual(f.knob_feedback[2],'52.0%')
+        self.assertEqual(f.display_lines(('old','old','old')),f.knob_feedback)
 
     def test_knob_indicators_enable_bit_control(self):
         packets=[]
