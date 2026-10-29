@@ -1,17 +1,9 @@
-# JC Records Fire 0.3.2 validation
+# JC Records Fire 0.4.0 validation
 
-44 host-mocked tests pass, including entry-point execution without __file__, note cleanup, clip scene releases, mute/solo, step extension, hidden melody preservation, parameter paging, FPC mapping, and rendering each mode. These tests do not emulate FL audio timing or the physical Fire.
+59 host-mocked tests pass using `python tests/test_fire.py`. Coverage includes touch-event isolation, held-step edits and repeat, velocity read-back and percentages, LED refresh, OLED keep-alive, exact synth page resolution, FLEX macro refresh, missing mappings, and Select shortcuts.
 
-Earlier 0.1.1 initialized in FL Studio 2026.1.7 API 45, and the user confirmed STEP/pad/NOTE worked. The new 0.2 features still require physical testing. Performance mode requires a prepared FL Playlist. Plugin mappings depend on exposed parameter names. Internal melody export requires manual Piano Roll import.
+Version 0.4.0 initialized in FL Studio 2026.1.7, MIDI scripting API 45, with output assigned. Harmor A/B and FLEX pages were resolved against live exposed parameter lists on 29 October 2026. The installed Harmor scan selected the expected Filter and Amp envelope parameters without a reported script error.
 
-On 28 October 2026, selected the updated script for FL STUDIO FIRE input/output port 1. FL Script Output confirmed: JC Records Fire 0.2 initialized | API 45 | output 1. No startup traceback was shown. FL retained the old 0.1.2 controller-list label from its cached list, while executing 0.2. New physical controls and audio remain unverified.
+The user confirmed step lights working after the preceding refresh fix. New physical knob behaviour, repeat playback, OLED duration, preset-specific audible results and automation recording still require hardware/audio confirmation. Mock tests and successful initialization do not establish complete physical controller compatibility. Other synths retain automatic profiles; their mappings have not been individually verified.
 
-0.3: 40 host-mocked tests pass, including chord inversions, hold release, latch separation, inactive-step darkness and unavailable pad lighting. New hardware behaviour remains to be verified.
-
-The user confirmed general operation and requested subsequent palette and status-indicator refinements. All mode palettes and red/green mute/solo indicator mappings have automated coverage; final physical verification of the latest indicators remains pending.
-
-FL Studio 2026.1.7 Script Output confirmed JC Records Fire 0.3 initialized | API 45 | output 1 after reload on 28 October 2026, with no startup traceback. Physical testing of the new chord and hold controls remains pending.
-
-0.3.1: 44 host-mocked tests pass, covering bank LED bit-control values, loaded-effect selection, built-in EQ writes and effect addition/removal. FL Studio 2026.1.7 initialized 0.3.1 on API 45 with output assigned and no startup traceback. Physical confirmation of the User 2 indicator remains pending.
-
-0.3.2: 48 host-mocked tests pass. Tests cover inert knob-touch events, hold-and-turn step edits, native step-repeat writes and immediate OLED read-back feedback. FL Studio initialized 0.3.2 successfully on API 45. Physical touch behaviour and native repeat playback remain to be confirmed. The Beta label was removed at the owner's request; this does not change the scope of validation.
+The project is published without a Beta label at the owner's request. This does not broaden the validation described above.

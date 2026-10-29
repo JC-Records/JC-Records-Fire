@@ -1,4 +1,4 @@
-# name=JC Records Fire 0.3.2
+# name=JC Records Fire 0.4.0
 # supportedDevices=FL STUDIO FIRE
 # author=JC Records / Codex; see THIRD_PARTY.md
 # GPL-3.0-or-later
@@ -22,6 +22,7 @@ import transport
 import ui
 import rusty_core
 from rusty_core import *
+from jc_synths import synth_layout
 try:
     import screen
 except ImportError:
@@ -50,15 +51,17 @@ class Fire:
         self.last_frame = self.last_scan = 0
         self.sleeping = False
         self.last_colors, self.last_text = None, None
+        self.last_screen_keepalive = 0
         self.message, self.message_until = '', 0
         self.param_signature, self.param_names, self.param_order = None, [], []
         self.param_target = None
+        self.param_page_titles = []
         self.scan_names, self.scan_cursor = [], 0
         self.last_context = None
         self.last_beats = None
         self.last_error = None
         self.screen_ok = False
-        self.config = {'sleep_seconds': 600, 'brightness': 0.55, 'frame_rate': 15,
+        self.config = {'sleep_seconds': 600, 'feedback_seconds': 30, 'brightness': 0.55, 'frame_rate': 15,
                        'velocity': 100, 'parameter_profiles': {}}
         path = os.path.join(HOME, 'settings.json')
         if os.path.isfile(path):
@@ -80,7 +83,7 @@ class Fire:
         return self.sequences[key]
 
     def notify(self, message):
-        self.message, self.message_until = message, time.monotonic()+2.5
+        self.message, self.message_until = message, time.monotonic()+max(5,float(self.config['feedback_seconds']))
         self.last_frame = 0
         ui.setHintMsg('JC Records: '+message)
 
@@ -91,13 +94,13 @@ class Fire:
             try:
                 screen.init(128,64,20,18,0xFFFFFF,0)
                 header = int.from_bytes(bytes((0xF0,0x47,0x7F,0x43,0x0E)), 'little')
-                screen.setup(header, 3600, 3600, 5, 2, 4000)
+                screen.setup(header, 3600, 3600, 5, 2, 600000)
                 self.screen_ok = True
             except Exception as exc:
                 print('JC Records OLED unavailable:',exc)
         device.setHasMeters()
-        print('JC Records Fire 0.3.2 initialized | API',general.getVersion(),'| output',device.isAssigned())
-        self.notify('JC Records Fire | 0.3.2')
+        print('JC Records Fire 0.4.0 initialized | API',general.getVersion(),'| output',device.isAssigned())
+        self.notify('JC Records Fire | 0.4.0')
         self.render(time.monotonic())
 
     def voice_on(self, owner, channel, notes, velocity):
@@ -129,6 +132,17 @@ class Fire:
         self.latched.clear()
         self.arp_clock = self.seq_tick = None
         self.arp_index = 0
+
+    def reset_playback(self):
+        # Loop/transport cleanup releases sounding notes, not physical step edits.
+        steps={p:v for p,v in self.held.items() if v[0]=='step'}
+        self.panic()
+        self.held.update(steps)
+
+    def read_step_value(self,c,step,param):
+        if hasattr(channels,'getStepParam'):
+            return channels.getStepParam(0,param,c,step,1)
+        return channels.getCurrentStepParam(c,step,param)
 
     def schedule(self, start, duration, ch, notes, velocity):
         self.serial += 1
@@ -166,8 +180,12 @@ class Fire:
             self.param_signature, self.param_target = signature,target
             self.scan_names, self.scan_cursor = [],0
             self.param_names, self.param_order = [],[]
+            self.param_page_titles = []
             self.param_page = 0
         count = signature[2]
+        # FLEX renames macro controls on preset changes without changing the count.
+        if count and count <= 64 and self.scan_cursor == 0 and len(self.scan_names) == count:
+            self.scan_names = []
         if len(self.scan_names) < count:
             end = min(count, self.scan_cursor+64)
             for p in range(self.scan_cursor,end):
@@ -177,7 +195,9 @@ class Fire:
                 self.param_names = self.scan_names[:]
                 profiles = self.config['parameter_profiles']
                 priority = profiles.get(signature[1], FX_PRIORITY if slot >= 0 else SYNTH_PRIORITY)
-                self.param_order = parameter_order(self.param_names,priority)
+                layout = synth_layout(signature[1],self.param_names) if slot < 0 else None
+                if layout:self.param_order,self.param_page_titles = layout
+                else:self.param_order = parameter_order(self.param_names,priority)
                 self.scan_cursor = 0
 
     def safe(self):
@@ -269,28 +289,30 @@ class Fire:
             return
         held_steps = [v for v in self.held.values() if v[0] == 'step']
         if self.mode == 'STEP' and held_steps:
-            params = ((midi.pVelocity,midi.pModY,midi.pShift,midi.pRepeat) if self.shift
-                      else (midi.pVelocity,midi.pPan,midi.pPitch,midi.pModX))
-            labels = (('Accent / velocity','Mod Y','Timing shift','Note repeat') if self.shift
-                      else ('Velocity','Pan','Pitch','Mod X'))
+            params = ((midi.pVelocity,midi.pPitch,midi.pShift,midi.pRepeat) if self.shift
+                      else (midi.pVelocity,midi.pRepeat,midi.pModX,midi.pModY))
+            labels = (('Accent / velocity','Pitch','Timing shift','Note repeat') if self.shift
+                      else ('Velocity','Note repeat','Mod X','Mod Y'))
             param=params[knob]
-            maximum=14 if param==midi.pRepeat else 127
+            maximum=14 if param==midi.pRepeat else 255 if param in (midi.pModX,midi.pModY,midi.pShift) else 127
             edited=False
             for v in held_steps:
                 _,c,s,pat,_=v
                 if pat!=patterns.patternNumber():continue
                 v[4]=True
-                channels.setGridBit(c,s,1)
-                old=channels.getCurrentStepParam(c,s,param)
+                if not channels.getGridBit(c,s):channels.setGridBit(c,s,1)
+                old=self.read_step_value(c,s,param)
+                if old<0:old={midi.pVelocity:100,midi.pPan:64,midi.pPitch:60,midi.pModX:128,midi.pModY:128}.get(param,0)
                 val=int(clamp(old+delta*(8 if self.shift and knob==0 else 1),0,maximum))
                 channels.setStepParameterByIndex(c,pat,s,param,val)
-                val=channels.getCurrentStepParam(c,s,param)
+                actual=self.read_step_value(c,s,param)
+                if actual>=0:val=actual
                 edited=True
             if edited:
                 repeats=('Off','1/4','1/8 dotted','1/4 triplet','1/8','1/16 dotted','1/8 triplet',
                          '1/16','1/32 dotted','1/16 triplet','1/32','1/64 dotted','1/32 triplet','1/64','1/64 triplet')
                 value=(repeats[int(clamp(val,0,14))] if param==midi.pRepeat else
-                       '%d (%.1f%%)'%(val,val/127*100))
+                       '%.1f%% (%d)'%(val/maximum*100,val))
                 self.show_knob_value('STEP %d CH %d'%(s+1,c+1),labels[knob],value)
             return
         if self.mode == 'MELODY' and self.held:
@@ -329,6 +351,8 @@ class Fire:
         offset = self.param_page*4+knob
         if offset < len(self.param_order):
             param = self.param_order[offset]
+            if param is None:
+                self.notify('Not exposed by plugin');return
             index,slot = self.param_target
             value = clamp(plugins.getParamValue(param,index,slot)+delta/(1000 if self.shift else 100),0,1)
             plugins.setParamValue(value,param,index,slot)
@@ -538,7 +562,8 @@ class Fire:
         now = time.monotonic()
         context = (self.global_channel(),patterns.patternNumber(),bool(transport.isPlaying()))
         if self.last_context is not None and context != self.last_context:
-            self.panic()
+            if context[:2]==self.last_context[:2]:self.reset_playback()
+            else:self.panic()
         self.last_context = context
         ch,pat,playing = context
         if not self.safe():
@@ -549,7 +574,7 @@ class Fire:
         # Host ticks anchor playback; stopped arp uses the monotonic clock.
         beats = transport.getSongPos(midi.SONGLENGTH_ABSTICKS)/max(1,general.getRecPPQ()) if playing else now/beat_seconds
         if playing and self.last_beats is not None and (beats < self.last_beats or beats-self.last_beats > 1):
-            self.panic()
+            self.reset_playback()
         self.last_beats = beats if playing else None
         if self.seq_enabled and playing and ch >= 0:
             tick = int(beats*4)
@@ -648,7 +673,7 @@ class Fire:
             if self.mode == 'NOTE':
                 title = self.scale+' '+CHORDS[self.chord_kind]+(' ARP' if self.arp else '')
             entries = self.param_order[self.param_page*4:self.param_page*4+4]
-            labels = [self.param_names[p][:9] for p in entries]
+            labels = [self.param_names[p][:9] if p is not None else '--' for p in entries]
             while len(labels) < 4:
                 labels.append('--')
             lines = (title,labels[0]+' / '+labels[1],labels[2]+' / '+labels[3])
@@ -658,6 +683,10 @@ class Fire:
             if now < self.message_until:
                 lines = (title,self.message[:21],self.message[21:42])
         lines = self.display_lines(lines)
+        # The OLED hardware can sleep even when our cached text is unchanged.
+        if self.screen_ok and now-self.last_screen_keepalive >= 1:
+            screen.keepDisplayActive()
+            self.last_screen_keepalive = now
         if self.screen_ok and lines != self.last_text:
             for row,text in enumerate(lines):
                 screen.displayText(1,0,row,text,False)
@@ -708,8 +737,17 @@ def guarded(method,*args):
 def OnInit():
     guarded(FireController.init)
 
+def refresh_lights():
+    if FireController.safe():
+        FireController.render(time.monotonic())
+
+
 def OnMidiMsg(event):
     guarded(FireController.event,event)
+    # Touch messages have no action, including no display refresh.
+    touch = event.status & 0xF0 in (0x80,0x90) and 16 <= event.data1 <= 19
+    if event.handled and not touch:
+        guarded(refresh_lights)
 
 def OnIdle():
     guarded(FireController.idle)
@@ -722,6 +760,17 @@ def OnProjectLoad(status):
 
 def OnRefresh(flags):
     FireController.last_frame = 0
+    guarded(refresh_lights)
+
+
+def OnDoFullRefresh():
+    FireController.last_colors = FireController.last_text = None
+    guarded(refresh_lights)
+
+
+def OnUpdateMeters():
+    # Registered by setHasMeters; also keeps animation alive if idle is delayed.
+    guarded(FireController.idle)
 
 def OnDirtyMixerTrack(track):
     FireController.last_frame = 0

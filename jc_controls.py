@@ -1,5 +1,6 @@
 """JC Records Fire control expansion. GPL-3.0-or-later."""
 import time
+from jc_synths import short_parameter_name
 import channels, device, general, midi, mixer, patterns, playlist, plugins, transport, ui
 from rusty_core import clamp, default_step, relative, scale_note, chord, SCALES, CHORDS, ARP_ORDERS, RATES
 
@@ -40,6 +41,7 @@ class JCControls:
                 if force or signature!=self.param_signature:
                     self.param_page=0
                 self.param_signature,self.param_target=signature,target
+                self.param_page_titles=[]
                 self.param_names=['Bass gain','Mid gain','Treble gain','Stereo separation',
                                   'Bass frequency','Mid frequency','Treble frequency','Track volume']
                 self.param_order=list(range(8))
@@ -68,6 +70,9 @@ class JCControls:
         super().change_mode(mode)
         if mode == 'MIXER':
             self.knob_mode = 'MIXER'
+        elif mode == 'NOTE':
+            self.knob_mode = 'USER1'
+            self.scan_parameters(time.monotonic(),True)
         elif mode == 'PERFORM':
             self.notify('CLIPS | SHIFT=mixer')
         self.param_signature = None
@@ -102,6 +107,11 @@ class JCControls:
         # Consume touch/release without waking displays or changing any state.
         if status in (0x80,0x90) and 16<=key<=19:
             event.handled=True
+            return
+        if status==0xB0 and key==118 and self.safe():
+            self.select_turn(relative(event.data2))
+            event.handled=True
+            self.last_action=time.monotonic();self.sleeping=False
             return
         down=status==0x90 and event.data2>0
         if not down or key in (48,49) or not self.safe():
@@ -209,6 +219,35 @@ class JCControls:
         else:
             super().event(event)
 
+    def select_turn(self,delta):
+        if not delta:return
+        if self.mode=='STEP' and any(v[0]=='step' for v in self.held.values()):
+            was=self.shift
+            self.shift=False
+            try:self.knob(0 if was else 1,delta)
+            finally:self.shift=was
+            return
+        if self.alt:
+            self.scan_parameters(time.monotonic(),self.target()!=self.param_target)
+            self.param_page=clamp(self.param_page+delta,0,max(0,(len(self.param_order)-1)//4))
+            title=self.param_page_titles[self.param_page] if self.param_page_titles else 'Parameters'
+            self.notify(title+' | page '+str(self.param_page+1))
+            return
+        if self.shift:
+            self.panic()
+            patterns.jumpToPattern(clamp(patterns.patternNumber()+delta,1,999))
+            self.notify('Pattern '+str(patterns.patternNumber()))
+        elif self.mode=='MIXER':
+            track=clamp(mixer.trackNumber()+delta,1,mixer.trackCount()-2)
+            mixer.setTrackNumber(track)
+            self.mix_bank=((track-1)//4)*4
+            self.notify('Mixer '+str(track))
+        elif channels.channelCount():
+            self.panic()
+            channels.selectOneChannel(clamp(self.selected()+delta,0,channels.channelCount()-1))
+            self.scan_parameters(time.monotonic(),True)
+            self.notify('Channel '+str(self.selected()+1))
+
     def pad_notes(self,pad):
         if self.chord_mode and self.mode=='NOTE':
             row,col=divmod(pad,16)
@@ -311,7 +350,9 @@ class JCControls:
                     value=(mixer.getEqGain(t,knob,0) if self.param_page==0 else mixer.getEqFrequency(t,knob,0))
                 else:value=mixer.getTrackStereoSep(t) if self.param_page==0 else mixer.getTrackVolume(t)
             elif self.param_page*4+knob<len(self.param_order):
-                p=self.param_order[self.param_page*4+knob];label=self.param_names[p]
+                p=self.param_order[self.param_page*4+knob]
+                if p is None:return
+                label=short_parameter_name(self.param_names[p])
                 value=plugins.getParamValue(p,*self.param_target)
         elif self.knob_mode=='CHANNEL' and self.selected()>=0:
             c=self.selected();label=('Volume','Pan','Pitch','Mixer route')[knob]
@@ -501,6 +542,9 @@ class JCControls:
 
     def display_lines(self,lines):
         if self.sleeping:return ('JC Records','FIRE AFTER DARK','Touch to wake')
+        if self.mode=='STEP' and any(v[0]=='step' for v in self.held.values()):
+            if self.knob_feedback and self.knob_feedback[0].startswith('STEP '):return self.knob_feedback
+            return ('STEP EDIT | HOLD','1 Vel 2 Repeat','3 Mod X 4 Mod Y')
         if time.monotonic()<self.message_until:return self.knob_feedback or lines
         if self.knob_mode=='USER2' and not (self.mode=='NOTE' and (self.shift or self.arp_page)):
             if self.param_signature and self.param_signature[1]=='Built-in mixer EQ':
@@ -508,6 +552,13 @@ class JCControls:
                         'Bass / Mid / Treble' if self.param_page==0 else 'Bass/Mid/Treble freq',
                         '4: Stereo separation' if self.param_page==0 else '4: Track volume')
             return ('USER2 FX%d T%d P%d'%(self.fx_slot+1,self.target()[0],self.param_page+1),lines[1],lines[2])
+        if self.knob_mode=='USER1' and self.param_page_titles and not (self.mode=='NOTE' and (self.shift or self.alt or self.arp_page)):
+            title=self.param_page_titles[min(self.param_page,len(self.param_page_titles)-1)]
+            entries=self.param_order[self.param_page*4:self.param_page*4+4]
+            names=[self.param_names[p] if p is not None else '--' for p in entries]
+            short=[short_parameter_name(n)[:10] for n in names]
+            short+=['--']*(4-len(short))
+            return (title+' P'+str(self.param_page+1),short[0]+' / '+short[1],short[2]+' / '+short[3])
         if self.mode=='NOTE' and not (self.shift or self.arp_page):
             title=('CHORD '+CHORDS[self.chord_kind] if self.chord_mode else 'NOTE')+(' HOLD' if self.note_hold else '')
             return (title,self.scale+' Root '+str(self.root),'Held %d | ALT+M3 hold'%len(self.sustained))

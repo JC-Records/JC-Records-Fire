@@ -1,19 +1,21 @@
-# JC Records Fire 0.3.2
+# JC Records Fire 0.4.0
 
 A colourful Akai Fire controller script for FL Studio 2026.1.7 (MIDI scripting API 45). Includes expandable Channel Rack sequencing, chords and arpeggiation, FPC-style drums, clip launching, mixer faders and paged synth/FX controls. See VALIDATION.md for what has been tested.
 
+See [the 0.4.0 control guide](CONTROLS-0.4.md) for Harmor A/B pages, FLEX pages and Select shortcuts. NOTE automatically selects USER1 synth controls. ALT + turn Select changes parameter pages; holding a STEP pad makes Select edit repeat (SHIFT + Select edits velocity finely). In Mixer, Select chooses tracks.
+
 ## Install
 
-1. Download this repository using **Code â†’ Download ZIP**, then extract it.
+1. Download this repository using **Code > Download ZIP**, then extract it.
 2. Create a folder named **JC Records Fire** inside your FL Studio User data folder under **Settings/Hardware**.
-3. Copy `device_DJ_RUSTY_Fire.py`, `rusty_core.py`, `jc_controls.py` and `settings.json` into that folder. Keep the Python filenames unchanged.
-4. In FL's MIDI settings, enable the **FL STUDIO FIRE** input and select **JC Records Fire 0.3.2**. Refresh the script list or restart FL if it is missing.
+3. Copy `device_DJ_RUSTY_Fire.py`, `rusty_core.py`, `jc_controls.py`, `jc_synths.py` and `settings.json` into that folder. Keep the Python filenames unchanged.
+4. In FL's MIDI settings, enable the **FL STUDIO FIRE** input and select **JC Records Fire 0.4.0**. Refresh the script list or restart FL if it is missing.
 5. Give the Fire input and output the same unused port number. Output is required for pad lights and OLED.
 6. Start with a test project. Select only one controller script for this Fire input.
 
-For upgrades from DJ RUSTY Fire, replace the four files in that existing Hardware folder instead of creating a second installation. Back up its Sessions and Exports folders first. FL may retain the older controller-list label until its list is refreshed.
+For upgrades from DJ RUSTY Fire, replace the five files in that existing Hardware folder instead of creating a second installation. Back up its Sessions and Exports folders first. FL may retain the older controller-list label until its list is refreshed.
 
-No watcher executable, MIDI bridge or external Python package is required. The previous loader fix initialized successfully in FL Studio 2026.1.7 (MIDI API 45); version 0.3 initialized successfully; the new controls need physical verification. Full controller feature testing remains incomplete.
+No watcher executable, MIDI bridge or external Python package is required. Version 0.4.0 initialized successfully in FL Studio 2026.1.7 (MIDI API 45). 59 host-mocked tests pass. Full physical controller and audio verification remains incomplete.
 
 ## Main controls
 
@@ -42,13 +44,13 @@ Select means pressing the large encoder. Mute buttons are numbered top to bottom
 | ALT + Browser | Export current internal melody to MIDI |
 | SHIFT + ALT + Browser | Load latest internal session, playback OFF |
 
-Mode/channel/pattern/transport changes release script-owned notes. Stop is the panic control for this script.
+Mode/channel/pattern changes release script-owned notes. Held-step edits survive playback loops and transport transitions. Stop is the panic control for this script.
 
 ## Drum step sequencer
 
 STEP displays four consecutive Channel Rack channels, sixteen steps per row. Tap a pad to toggle the native FL step on release. Up/down changes Channel Rack banks. Round buttons mute rows; SHIFT + round solos; ALT + round selects. Grid left/right selects pages, automatically extending the pattern up to 256 steps. SHIFT + grid arrows changes length by sixteen steps. Length changes affect the whole FL pattern; shortening can hide later steps.
 
-Hold a step and turn knobs for velocity, pan, pitch and Mod X. Knob edits prevent that pad toggling off on release. SHIFT + pad alone does not apply an accent; hold the step and turn SHIFT + knob 1. Track-select buttons select rows; SHIFT + track-select toggles channel mute.
+Hold a step and turn knobs for velocity, note repeat, Mod X and Mod Y. Knob edits prevent that pad toggling off on release. SHIFT + pad alone does not apply an accent; hold the step and turn SHIFT + knob 1. Track-select buttons select rows; SHIFT + track-select toggles channel mute.
 
 These edits write FL Channel Rack steps and are saved with the FLP. Tap toggles an existing step off; hold and turn a knob to edit it instead.
 
@@ -88,7 +90,9 @@ Scheduling runs in OnIdle, anchored to host position while playing and tempo whi
 
 ## Plugin and drum FX knobs
 
-The script discovers the loaded plugin's exposed names/values. Name priorities are supplied for FLEX, Sytrus, 3x Osc, Serum, Vital, FPC, Reeverb 2, Delay 3, Parametric EQ 2, Limiter, Blood Overdrive and Fast Dist. These are preferred names, not verified fixed parameter indices. Matches need checking against your installed versions/presets.
+Harmor has exact-name pages for Filter, Amp envelope, Time, Phaser and Filter envelope, for both parts A and B. FLEX has Filter, Amp envelope, Filter envelope, Delay, Reverb and two preset-macro pages. These destinations were resolved against live FL parameter lists. Missing or ambiguous named controls remain unassigned.
+
+For other plugins, the script discovers the loaded plugin's exposed names/values. Name priorities are supplied for FLEX, Sytrus, 3x Osc, Serum, Vital, FPC, Reeverb 2, Delay 3, Parametric EQ 2, Limiter, Blood Overdrive and Fast Dist. These are preferred names, not verified fixed parameter indices. Matches need checking against your installed versions/presets.
 
 Common macros, filters, envelopes and modulation controls are prioritised. Arrows page through every remaining exposed parameter. OLED labels show actual resolved names. Unmatched priorities are skipped; other plugins get generic name ranking. SHIFT gives fine adjustment except in NOTE, where it controls the arp.
 
@@ -171,9 +175,13 @@ The knob-bank LED now uses the Fire bit-control flag for all four banks. User 2 
 
 If that track has no exposed effects, User 2 is preassigned to built-in mixer controls: page 1 = bass gain, mid gain, treble gain, stereo separation; page 2 = bass frequency, mid frequency, treble frequency, track volume. SHIFT makes fine adjustments except in NOTE mode, where SHIFT retains arp editing. The OLED identifies the target track and page. Loading an effect automatically switches to its exposed parameters. No effects are inserted automatically.
 
-## 0.3.2 held-step editing
+## Held-step editing
 
 
-Knob touch/release messages are consumed without actions. Only encoder rotation edits values. Hold a STEP pad and turn: knob 1 velocity, 2 pan, 3 pitch, 4 Mod X. Hold the step with SHIFT: knob 1 accent/velocity (larger increments), 2 Mod Y, 3 timing shift, 4 native note repeat (Off through FL repeat rates). Release after editing leaves that step active. Without a turn, tapping toggles the step as before; SHIFT no longer applies accent on pad press.
+Knob touch/release messages are consumed without actions. Only encoder rotation edits values. Hold a STEP pad and turn: knob 1 velocity, 2 note repeat, 3 Mod X, 4 Mod Y. Hold the step with SHIFT: knob 1 accent/velocity (larger increments), 2 pitch, 3 timing shift, 4 native note repeat (Off through FL repeat rates). Release after editing leaves that step active. Without a turn, tapping toggles the step as before; SHIFT no longer applies accent on pad press.
 
-The OLED updates immediately on knob rotation with the edited parameter and value read back from FL. Continuous effect values show normalized percentages; step repeat shows its musical rate. Normal STEP parameter values show raw 0-127 and percentage. Plugin percentages describe the exposed normalized control, not physical units such as Hz or milliseconds.
+The OLED updates immediately on knob rotation with the edited parameter and value read back from FL. Continuous effect values show normalized percentages; step repeat shows its musical rate. Velocity and pitch use 0-127; Mod X/Y and timing shift use 0-255, with percentages scaled accordingly. Plugin percentages describe the exposed normalized control, not physical units such as Hz or milliseconds.
+
+## OLED feedback
+
+Knob feedback lasts 30 seconds by default and held-step feedback stays visible until release. The OLED keep-alive prevents premature display blanking; idle animations still begin after 10 minutes.
